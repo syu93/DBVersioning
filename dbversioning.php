@@ -61,16 +61,41 @@ class dbversioning {
 		}
 
 
-		$host = "localhost";
+		// Required dsn informations
+		$host 	= "localhost";
 		$dbname = "";
 		$user 	= "root";
 		$pass 	= "";
 		$port 	= "3306";
 
-		$h = array_search('-h', $arguments);
-		$d = array_search('-d', $arguments);
-		$u = array_search('-u', $arguments);		
-		$p = array_search('-p', $arguments);
+		// Optionals database parameter
+		$table 	= false;
+		$fPath 	= "dbv";
+
+		$h 		= array_search('-h', $arguments);
+		$d 		= array_search('-d', $arguments);
+		$u 		= array_search('-u', $arguments);
+		$p 		= array_search('-p', $arguments);
+
+		$t 		= array_search('-t', $arguments);
+		$path 	= array_search('--path', $arguments);
+
+		// Handle the -d dbname option
+		if ($d) {
+			$nextIsOpt = 0;
+			$isNotLast = isset($arguments[$d +1]);
+			if ($isNotLast) {
+				$nextIsOpt = preg_match("/-\w/", $arguments[$d +1]);
+			} else {
+				throw new Exception("Syntax error with argument -d \n Refer help -h for more details", 1);
+			}
+
+			if ($nextIsOpt === 0) {
+				$dbname = trim($arguments[$d + 1]);
+			} else {
+				throw new Exception("Syntax error with argument -d \n Refer help -h for more details", 1);
+			}
+		}
 
 		// Handle the -p password option
 		if ($p) {
@@ -104,24 +129,64 @@ class dbversioning {
 		$this->pdo = new PDO($dsn, $user, $pass, $driverOptions);
 
 		$this->printContent(PHP_EOL . "[init] Database connection established", "light_cyan");
+		$this->exportRecords($dbname, $table, $fPath);
 
-		$this->exportData("plop");
 	}
 
-	public function exportData($database, $table = false, $folderPath = ".")
+	/**
+	 * Read the database and export records of each table in a json file
+	 * @param  string  $database   The database name to  be used
+	 * @param  string  $table      Specify the table to export if not false
+	 * @param  string  $folderPath The dbv installation path
+	 * @return [type]              [description]
+	 */
+	public function exportRecords($database, $table = false, $folderPath = "dbv")
 	{
-		$pdo = $this->pdo;
+		$pdo 			= $this->pdo;
+		$queryStructure = "";
+		$result			= array();
 
-		// $queryStructure = "SHOW TABLES FROM prestashop;";
-		$queryStructure = "SELECT * FROM prestashop.ps_access";
+		// var_dump($database, $table);
+		if (!$table) {
+			$queryStructure = "SHOW TABLES FROM $database;";
 
-		$req = $pdo->prepare($queryStructure);
-		$req->execute([]);
-		$result = $req->fetchAll();
-		
-		file_put_contents("dbv/data/ps_access.json", json_encode($result));
+			$req = $pdo->prepare($queryStructure);
+			$req->execute();
+			$result = $req->fetchAll();
+		}
 
-		var_dump(json_decode(file_get_contents("dbv/data/ps_access.json")));
+		if (!file_exists($folderPath)) {
+			$this->printContent("[init] Creating dbv folder", "light_cyan");
+			mkdir($folderPath);
+		}
+		if (!file_exists($folderPath . "/data")) {
+			$this->printContent("[init] Creating data folder", "light_cyan");
+			mkdir($folderPath . "/data");
+		}
+		if (!file_exists($folderPath . "/data/records")) {
+			$this->printContent("[init] Creating records folder", "light_cyan");
+			mkdir("dbv/data/records");
+		}
+
+		if (file_exists($folderPath . "/data/records")) {
+			$this->printContent("[init] Reading records in records folder", "light_cyan");
+			$this->printContent("[init] Creating records files", "light_cyan");
+
+			if (!$table) {
+				foreach ($result as $key => $value) {
+					$tName = $value['Tables_in_prestashop'];
+
+					$queryRecords = "SELECT * FROM $tName";
+
+					$req = $pdo->prepare($queryRecords);
+					$req->execute();
+					$records = $req->fetchAll();
+
+					file_put_contents($folderPath . "/data/records/$tName.json", json_encode($records));
+				}
+			}
+			$this->printContent("[init] Successfully create records files", "light_cyan");
+		}
 
 	}
 
@@ -145,6 +210,22 @@ class dbversioning {
 		$input = trim($line);
 		fclose($handle);
 		return $input;
+	}
+
+	private function _emptyDir($dirPath = '')
+	{
+		if (!is_readable($dirPath)){
+			return NULL; 
+		}
+
+		$handle = opendir($dirPath);
+
+		while (false !== ($entry = readdir($handle))) {
+			if ($entry != "." && $entry != "..") {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/**
