@@ -54,6 +54,51 @@ class dbversioning {
 		}
 	}
 
+	public function getConnection($host = "localhost", $dbname = "", $user = "root", $pass = "", $port = "3306", $fPath = "dbv")
+	{
+		if (!defined('PDO::ATTR_DRIVER_NAME')) {
+			throw new Exception("PDO driver unavailable", 1);
+		}
+
+		$configExist = file_exists($fPath . "/dbv.json");
+
+		if ($configExist) {
+			$config = json_decode(file_get_contents($fPath . "/dbv.json"), true);
+			/**
+			 * $host
+			 * $dbname
+			 * $user
+			 * $pass
+			 * $port
+			 * $fPath
+			 */
+			extract($config, EXTR_OVERWRITE);
+		}
+
+		$dsn = "mysql:host=$host;dbname=$dbname;port=$port";
+		$driverOptions = array(
+		   PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES 'utf8'",
+		   PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+		   PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+		);
+		$this->pdo = new PDO($dsn, $user, $pass, $driverOptions);
+
+		$this->printContent(PHP_EOL . "[init] Database connection established", "light_cyan");
+
+		if (!$configExist) {
+			$config = array(
+				"host" 	=> $host,
+				"dbname" => $dbname,
+				"port" => $port,
+				"user" => $user,
+				"pass" => $pass,
+				);
+			// Require PHP =^5.4
+			file_put_contents($fPath . "/dbv.json", json_encode($config, JSON_PRETTY_PRINT));
+			$this->printContent("[init] Config file created", "light_cyan");
+		}
+	}
+
 	public function initDataVersioning($arguments)
 	{
 		if (!defined('PDO::ATTR_DRIVER_NAME')) {
@@ -162,13 +207,13 @@ class dbversioning {
 			if ($isNotLast) {
 				$nextIsOpt = preg_match("/-\w/", $arguments[$path +1]);
 			} else {
-				throw new Exception("Syntax error with argument -path \n Refer help -h for more details", 1);
+				throw new Exception("Syntax error with argument --path \n Refer help -h for more details", 1);
 			}
 
 			if ($nextIsOpt === 0) {
 				$fPath = trim($arguments[$path + 1]);
 			} else {
-				throw new Exception("Syntax error with argument -path \n Refer help -h for more details", 1);
+				throw new Exception("Syntax error with argument --path \n Refer help -h for more details", 1);
 			}
 		}
 
@@ -196,15 +241,8 @@ class dbversioning {
 			}
 		}
 
-		$dsn = "mysql:host=$host;dbname=$dbname;port=$port";
-		$driverOptions = array(
-		   PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES 'utf8'",
-		   PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-		   PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-		);
-		$this->pdo = new PDO($dsn, $user, $pass, $driverOptions);
+		$this->getConnection($host, $dbname, $user, $pass, $port, $fPath);
 
-		$this->printContent(PHP_EOL . "[init] Database connection established", "light_cyan");
 		$this->exportRecords($dbname, $table, $fPath);
 	}
 
@@ -285,7 +323,35 @@ class dbversioning {
 
 	public function diffRecords($arguments)
 	{
-		# code...
+
+		$fPath 	= "dbv";
+
+		$H 		= array_search('-H', $arguments);
+		
+		$t 		= array_search('-t', $arguments);
+
+		$path 	= array_search('--path', $arguments);
+
+		// handle the --path option
+		if ($path) {
+			$nextIsOpt = 0;
+			$isNotLast = isset($arguments[$path + 1]);
+			if ($isNotLast) {
+				$nextIsOpt = preg_match("/-\w/", $arguments[$path +1]);
+			} else {
+				throw new Exception("Syntax error with argument --path \n Refer help -h for more details", 1);
+			}
+
+			if ($nextIsOpt === 0) {
+				$fPath = trim($arguments[$path + 1]);
+			} else {
+				throw new Exception("Syntax error with argument --path \n Refer help -h for more details", 1);
+			}
+		}
+
+		// if ()
+
+		$config = file_get_contents($fPath . "/dbv.json");
 	}
 
 	/**
