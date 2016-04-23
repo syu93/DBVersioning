@@ -148,6 +148,23 @@ class dbversioning {
 			}
 		}
 
+		// handle the --path option
+		if ($path) {
+			$nextIsOpt = 0;
+			$isNotLast = isset($arguments[$path + 1]);
+			if ($isNotLast) {
+				$nextIsOpt = preg_match("/-\w/", $arguments[$path +1]);
+			} else {
+				throw new Exception("Syntax error with argument -path \n Refer help -h for more details", 1);
+			}
+
+			if ($nextIsOpt === 0) {
+				$fPath = trim($arguments[$path + 1]);
+			} else {
+				throw new Exception("Syntax error with argument -path \n Refer help -h for more details", 1);
+			}
+		}
+
 		// Handle the -p password option
 		// Handle as last argument because of special behaviour
 		if ($p) {
