@@ -130,7 +130,6 @@ class dbversioning {
 
 		$this->printContent(PHP_EOL . "[init] Database connection established", "light_cyan");
 		$this->exportRecords($dbname, $table, $fPath);
-
 	}
 
 	/**
@@ -138,7 +137,7 @@ class dbversioning {
 	 * @param  string  $database   The database name to  be used
 	 * @param  string  $table      Specify the table to export if not false
 	 * @param  string  $folderPath The dbv installation path
-	 * @return [type]              [description]
+	 * @return void
 	 */
 	public function exportRecords($database, $table = false, $folderPath = "dbv")
 	{
@@ -186,8 +185,14 @@ class dbversioning {
 				}
 			}
 			$this->printContent("[init] Successfully create records files", "light_cyan");
+			
+			$this->printContent("[Tip] Run \"diff\" command to generate revision files", "brown");
 		}
+	}
 
+	public function diffRecords($arguments)
+	{
+		# code...
 	}
 
 	/**
@@ -212,6 +217,11 @@ class dbversioning {
 		return $input;
 	}
 
+	/**
+	 * Test if a folder is empty
+	 * @param  string $dirPath path to folder to test
+	 * @return boolean         If the folder is empty or not
+	 */
 	private function _emptyDir($dirPath = '')
 	{
 		if (!is_readable($dirPath)){
@@ -254,7 +264,7 @@ class dbversioning {
 
 	/**
 	 * Print the DBVersioning version
-	 * @return None
+	 * @return void
 	 */
 	public function printVersion()
 	{
@@ -263,6 +273,14 @@ class dbversioning {
 		$this->printContent(self::VERSION, 'yellow');
 	}
 
+	/**
+	 * Print content to the user with colors
+	 * @param  string  $content content to be printed
+	 * @param  string  $fcolor  Foreground color name
+	 * @param  string  $bcolor  Background color name
+	 * @param  boolean $eol     If the console should return to the line
+	 * @return void
+	 */
 	public function printContent($content = '', $fcolor = null, $bcolor = null, $eol = true)
 	{
 		$colors = new Colors();
@@ -274,6 +292,10 @@ class dbversioning {
 		echo $colors->getColoredString($contents, $fcolor, $bcolor);
 	}
 
+	/**
+	 * Print help menu to the user
+	 * @return void
+	 */
 	public function printHelp()
 	{
 		$name = "
