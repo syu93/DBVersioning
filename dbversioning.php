@@ -72,6 +72,8 @@ class dbversioning {
 		$table 	= false;
 		$fPath 	= "dbv";
 
+		$H 		= array_search('-H', $arguments);
+		
 		$d 		= array_search('-d', $arguments);
 		$h 		= array_search('-h', $arguments);
 		$u 		= array_search('-u', $arguments);
@@ -79,6 +81,11 @@ class dbversioning {
 
 		$t 		= array_search('-t', $arguments);
 		$path 	= array_search('--path', $arguments);
+
+		if ($H) {
+			$this->printCommandHelp("init");
+			return;
+		}
 
 		// Handle the -d dbname option
 		if ($d) {
@@ -374,6 +381,60 @@ class dbversioning {
 		echo $colors->getColoredString($contents, $fcolor, $bcolor);
 	}
 
+	private function _getContent($content = '', $fcolor = null, $bcolor = null)
+	{
+		$colors = new Colors();
+		$contents = $content;
+
+		return $colors->getColoredString($contents, $fcolor, $bcolor) . " ";
+	}
+
+	public function printCommandHelp($cmd)
+	{
+		switch ($cmd) {
+			case 'about':
+				# code...
+				break;
+			case 'init':
+		    	$usageTitle = "Usage:";
+		    	$usage 		= <<< EOH
+  init [options]
+EOH;
+
+		    	$optsTitle 	= "Options:";
+				$options 	= <<< EOH
+  -d 		Database name.
+  -h 		Server host name.
+  -u 		Database user.
+  -p 		Database password.
+  -t 		[optional] the table to be exported.
+  --path 	[optional] The dbv folder path. Default: dbv
+EOH;
+
+		    	$helpTitle 	= "Help:";
+		    	$helpStart 	= "  The ";
+		    	$cmdName 	= "init ";
+		    	$help 		= "command initialize DBVersioning by reading and saving database records
+  in the 'dbv/data/records/";
+
+				$this->printContent($usageTitle, 'yellow');
+				$this->printContent($usage . PHP_EOL);
+				$this->printContent($optsTitle, 'yellow');
+				$this->printContent($options . PHP_EOL, 'green');
+				$this->printContent($helpTitle, 'yellow');
+				$this->printContent($helpStart, 'green', null, false);
+				$this->printContent($cmdName, 'light_cyan', null, false);
+				$this->printContent($help, 'green', null, false);
+				$this->printContent("table_name","brown", null, false);
+				$this->printContent(".json'.", "green");
+				break;
+			
+			default:
+				throw new Exception('command does not exist');
+				break;
+		}
+	}
+
 	/**
 	 * Print help menu to the user
 	 * @return void
@@ -394,16 +455,18 @@ class dbversioning {
     	$usageTitle = "Usage:";
     	$usage 		= <<< EOH
   command [options] [arguments]
+  command -H for help
 EOH;
 
     	$optsTitle 	= "Options:";
 		$options 	= <<< EOH
-  -v 	(DBVersioning version)
+  -v 		Display the application version.
+  -h, --help 	Display this help message.
 EOH;
 
     	$cmdTitle 	= "The following commands are currently supported:";
     	$commands	= <<< EOH
-  about 	(Short information about DBVersioning)
+  init 		Initialize DBVersioning by reading and saving records.
 EOH;
 
 		$this->printContent($name, 'green');
