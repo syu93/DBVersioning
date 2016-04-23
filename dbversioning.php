@@ -15,9 +15,6 @@ class dbversioning {
 	public function run($arguments)
 	{
 		try {
-			$this->argumentsList 	= array("init");
-			$this->optionsList 		= array("-p");
-
 			if (!isset($arguments[1]) || $arguments[1] == "-h") {
 				$this->printHelp();
 				exit;
@@ -32,6 +29,9 @@ class dbversioning {
 					$this->printAbout();
 					break;
 				case 'init':
+					$this->initDataVersioning($arguments);
+					break;
+				case 'diff':
 					$this->initDataVersioning($arguments);
 					break;
 				default:
@@ -246,7 +246,11 @@ class dbversioning {
 		if (file_exists($folderPath . "/data/records")) {
 			$this->printContent("[init] Reading records in records folder", "light_cyan");
 
+
 			if (!$table) {
+				$countTalbe = count($result);
+				$this->printContent("[init] $countTalbe tables found in $database", "light_cyan");
+
 				$this->printContent("[init] Creating records files", "light_cyan");
 				foreach ($result as $key => $value) {
 					$tName = $value['Tables_in_prestashop'];
