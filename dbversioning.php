@@ -72,8 +72,8 @@ class dbversioning {
 		$table 	= false;
 		$fPath 	= "dbv";
 
-		$h 		= array_search('-h', $arguments);
 		$d 		= array_search('-d', $arguments);
+		$h 		= array_search('-h', $arguments);
 		$u 		= array_search('-u', $arguments);
 		$p 		= array_search('-p', $arguments);
 
@@ -97,7 +97,59 @@ class dbversioning {
 			}
 		}
 
+		// Handle the -h option
+		if ($h) {
+			$nextIsOpt = 0;
+			$isNotLast = isset($arguments[$h + 1]);
+			if ($isNotLast) {
+				$nextIsOpt = preg_match("/-\w/", $arguments[$h +1]);
+			} else {
+				throw new Exception("Syntax error with argument -h \n Refer help -h for more details", 1);
+			}
+
+			if ($nextIsOpt === 0) {
+				$host = trim($arguments[$h + 1]);
+			} else {
+				throw new Exception("Syntax error with argument -h \n Refer help -h for more details", 1);
+			}
+		}
+
+		// handle the -u option
+		if ($u) {
+			$nextIsOpt = 0;
+			$isNotLast = isset($arguments[$u + 1]);
+			if ($isNotLast) {
+				$nextIsOpt = preg_match("/-\w/", $arguments[$u +1]);
+			} else {
+				throw new Exception("Syntax error with argument -u \n Refer help -h for more details", 1);
+			}
+
+			if ($nextIsOpt === 0) {
+				$user = trim($arguments[$u + 1]);
+			} else {
+				throw new Exception("Syntax error with argument -u \n Refer help -h for more details", 1);
+			}
+		}
+
+		// handle the -y option
+		if ($t) {
+			$nextIsOpt = 0;
+			$isNotLast = isset($arguments[$t + 1]);
+			if ($isNotLast) {
+				$nextIsOpt = preg_match("/-\w/", $arguments[$t +1]);
+			} else {
+				throw new Exception("Syntax error with argument -t \n Refer help -h for more details", 1);
+			}
+
+			if ($nextIsOpt === 0) {
+				$table = trim($arguments[$t + 1]);
+			} else {
+				throw new Exception("Syntax error with argument -t \n Refer help -h for more details", 1);
+			}
+		}
+
 		// Handle the -p password option
+		// Handle as last argument because of special behaviour
 		if ($p) {
 			// Check if the string following the -p option is not another option
 			$nextIsOpt = 0;
@@ -169,9 +221,9 @@ class dbversioning {
 
 		if (file_exists($folderPath . "/data/records")) {
 			$this->printContent("[init] Reading records in records folder", "light_cyan");
-			$this->printContent("[init] Creating records files", "light_cyan");
 
 			if (!$table) {
+				$this->printContent("[init] Creating records files", "light_cyan");
 				foreach ($result as $key => $value) {
 					$tName = $value['Tables_in_prestashop'];
 
@@ -183,6 +235,19 @@ class dbversioning {
 
 					file_put_contents($folderPath . "/data/records/$tName.json", json_encode($records));
 				}
+			} else if (!empty($table)) {
+				$this->printContent("[init] Creating records files for table ", "light_cyan", null, false);
+				$this->printContent($table, "light_green");
+
+				$tName = $table;
+
+				$queryRecords = "SELECT * FROM $tName";
+
+				$req = $pdo->prepare($queryRecords);
+				$req->execute();
+				$records = $req->fetchAll();
+
+				file_put_contents($folderPath . "/data/records/$tName.json", json_encode($records));
 			}
 			$this->printContent("[init] Successfully create records files", "light_cyan");
 			
