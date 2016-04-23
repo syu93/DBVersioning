@@ -18,7 +18,7 @@ class dbversioning {
 			$this->argumentsList 	= array("init");
 			$this->optionsList 		= array("-p");
 
-			if (!isset($arguments[1])) {
+			if (!isset($arguments[1]) || $arguments[1] == "-h") {
 				$this->printHelp();
 				exit;
 			}
