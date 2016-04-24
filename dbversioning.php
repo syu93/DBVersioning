@@ -343,6 +343,7 @@ class dbversioning {
 		$table  = false;
 		$length = 3;
 		$fPath 	= "dbv";
+		$tSkip  = array();
 
 		$H 		= array_search('-H', $arguments);
 		
@@ -350,6 +351,7 @@ class dbversioning {
 		$l 		= array_search('-l', $arguments);
 
 		$path 	= array_search('--path', $arguments);
+		$skip 	= array_search('--skip', $arguments);
 
 
 		// handle the -t option
@@ -403,6 +405,27 @@ class dbversioning {
 			}
 		}
 
+		// handle the --skip option
+		if ($skip) {
+			$len = count($arguments);
+			$tSkipId = $skip+1;
+
+			$y = 0;
+			for ($i=$tSkipId; $i < $len; $i++) {
+				$nextIsOpt = 0;
+				$isNotLast = isset($arguments[$skip + 1]);
+				if ($isNotLast) {
+					$nextIsOpt = preg_match("/-\w/", $arguments[$tSkipId + $y]);
+				} else {
+					throw new Exception("Syntax error with argument --skip \n Refer help -h for more details", 1);
+				}
+				if ($nextIsOpt === 0) {
+					$tSkip[] = trim($arguments[$tSkipId + $y]);
+				}
+				$y++;
+			}
+		}
+
 		$noRecords = $this->_emptyDir($fPath . "/data/records");
 		$configExist = file_exists($fPath . "/dbv.json");
 		if ($noRecords) {
@@ -415,7 +438,7 @@ class dbversioning {
 		
 		$dbname = $this->dbname;
 		$fPath 	= $this->fPath;
-		$this->diffRecords($dbname, $table, $fPath, $length);
+		$this->diffRecords($dbname, $table, $fPath, $length, $tSkip);
 	}
 
 	/**
@@ -425,7 +448,7 @@ class dbversioning {
 	 * @param  string  $folderPath [Optional] The dbv folder path name. Default: dbv
 	 * @return void
 	 */
-	public function diffRecords($database, $table = false, $folderPath = "dbv", $length = 3)
+	public function diffRecords($database, $table = false, $folderPath = "dbv", $length = 3, $tSkip)
 	{
 		$pdo 			= $this->pdo;
 		$queryStructure = "";
@@ -446,13 +469,17 @@ class dbversioning {
 			$result = $req->fetchAll();
 		}
 
+		$skiping = false;
 		if (!$table) {
 			$countTalbe = count($result);
-			$this->printContent("[init] $countTalbe tables found in $database", "light_cyan");
-
-			$this->printContent("[init] Creating records files", "light_cyan");
+			$this->printContent("[diff] $countTalbe tables found in $database", "light_cyan");
 			foreach ($result as $key => $value) {
 				$tName = $value['Tables_in_prestashop'];
+
+				if (in_array($tName, $tSkip)) {
+					$skiping = true;
+					continue;
+				}
 
 				$queryRecords = "SELECT * FROM $tName";
 
@@ -460,8 +487,13 @@ class dbversioning {
 				$req->execute();
 				$records = $req->fetchAll();
 
-				// FIXME : get record file and compare from multiple table
+				// FIXME : get record file and compare from multiple table				
 			}
+
+			if ($skiping) {
+				$this->printContent("[diff] Skiping : " . implode(", ", $tSkip), "light_cyan");
+			}
+			$this->printContent("[diff] Creating records files", "light_cyan");
 		} else {
 			$tName = $table;
 
@@ -526,7 +558,6 @@ class dbversioning {
 				// If there a diff between records
 				if (!empty($diff)) {
 					$this->_createMigrationFile("update", $table, $primary, $pId, $diff, $length);
-				} else {
 				}
 			}
 		}
