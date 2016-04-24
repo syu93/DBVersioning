@@ -32,7 +32,7 @@ class dbversioning {
 					$this->initDataVersioning($arguments);
 					break;
 				case 'diff':
-					$this->initDataVersioning($arguments);
+					$this->diffDataVersioning($arguments);
 					break;
 				default:
 					throw new Exception('command does not exist');
@@ -83,7 +83,14 @@ class dbversioning {
 		);
 		$this->pdo = new PDO($dsn, $user, $pass, $driverOptions);
 
-		$this->printContent(PHP_EOL . "[init] Database connection established", "light_cyan");
+		$this->printContent("[init] Database connection established", "light_cyan");
+
+		$this->host  	= $host;
+		$this->dbname  	= $dbname;
+		$this->user  	= $user;
+		$this->pass  	= $pass;
+		$this->port  	= $port;
+		$this->fPath  	= $fPath;
 
 		if (!$configExist) {
 			$config = array(
@@ -241,8 +248,13 @@ class dbversioning {
 			}
 		}
 
+		$this->printContent("");
+
 		$this->getConnection($host, $dbname, $user, $pass, $port, $fPath);
 
+
+		$dbname = $this->dbname;
+		$fPath  = $this->fPath;
 		$this->exportRecords($dbname, $table, $fPath);
 	}
 
@@ -259,7 +271,6 @@ class dbversioning {
 		$queryStructure = "";
 		$result			= array();
 
-		// var_dump($database, $table);
 		if (!$table) {
 			$queryStructure = "SHOW TABLES FROM $database;";
 
@@ -321,9 +332,10 @@ class dbversioning {
 		}
 	}
 
-	public function diffRecords($arguments)
+	public function diffDataVersioning($arguments)
 	{
 
+		$table  = false;
 		$fPath 	= "dbv";
 
 		$H 		= array_search('-H', $arguments);
@@ -331,6 +343,24 @@ class dbversioning {
 		$t 		= array_search('-t', $arguments);
 
 		$path 	= array_search('--path', $arguments);
+
+
+		// handle the -y option
+		if ($t) {
+			$nextIsOpt = 0;
+			$isNotLast = isset($arguments[$t + 1]);
+			if ($isNotLast) {
+				$nextIsOpt = preg_match("/-\w/", $arguments[$t +1]);
+			} else {
+				throw new Exception("Syntax error with argument -t \n Refer help -h for more details", 1);
+			}
+
+			if ($nextIsOpt === 0) {
+				$table = trim($arguments[$t + 1]);
+			} else {
+				throw new Exception("Syntax error with argument -t \n Refer help -h for more details", 1);
+			}
+		}
 
 		// handle the --path option
 		if ($path) {
@@ -349,9 +379,95 @@ class dbversioning {
 			}
 		}
 
-		// if ()
+		$noRecords = $this->_emptyDir($fPath . "/data/records");
+		$configExist = file_exists($fPath . "/dbv.json");
+		if ($noRecords) {
+			throw new Exception("Run init first to create records", 1);
+		} else if (!$configExist) {
+			throw new Exception("Missing config file \n Run init to create it \n or use --path to indicate the right path", 1);
+			
+		}
+		$this->getConnection();
+		
+		$dbname = $this->dbname;
+		$fPath 	= $this->fPath;
+		$this->diffRecords($dbname, $table, $fPath);
+	}
 
-		$config = file_get_contents($fPath . "/dbv.json");
+	public function diffRecords($database, $table = false, $folderPath = "dbv")
+	{
+		$pdo 			= $this->pdo;
+		$queryStructure = "";
+		$result			= array();
+
+		if (!$table) {
+			$queryStructure = "SHOW TABLES FROM $database;";
+			$req = $pdo->prepare($queryStructure);
+			$req->execute();
+			$result = $req->fetchAll();
+		}
+
+		if (!$table) {
+			$queryStructure = "SHOW TABLES FROM $database;";
+
+			$req = $pdo->prepare($queryStructure);
+			$req->execute();
+			$result = $req->fetchAll();
+		}
+
+		if (!$table) {
+			$countTalbe = count($result);
+			$this->printContent("[init] $countTalbe tables found in $database", "light_cyan");
+
+			$this->printContent("[init] Creating records files", "light_cyan");
+			foreach ($result as $key => $value) {
+				$tName = $value['Tables_in_prestashop'];
+
+				$queryRecords = "SELECT * FROM $tName";
+
+				$req = $pdo->prepare($queryRecords);
+				$req->execute();
+				$records = $req->fetchAll();
+
+				// get record file and compare
+			}
+		} else {
+			$tName = $table;
+
+			$filePath = $folderPath . "/data/records/" . $tName . ".json";
+
+			if (!file_exists($filePath)) {
+				throw new Exception("Record not fund \n Try run init to export this record", 1);
+			}
+
+			$queryRecords = "SELECT * FROM $tName";
+
+			$req = $pdo->prepare($queryRecords);
+			$req->execute();
+			$records = $req->fetchAll();
+
+			$registeredRecord = json_decode(file_get_contents($filePath), true);
+
+			$this->operateDiff($registeredRecord, $records);
+		}
+
+	}
+
+	public function operateDiff($registeredRecord, $records)
+	{
+		if (count($records) != count($registeredRecord)) {
+			// Record added or removed
+			if (count($records) > count($registeredRecord)) {
+				// Record added
+			} else {
+				// Record removed
+			}
+		} else {
+			// record updated
+			// array_diff_assoc($records, $registeredRecord);
+			// var_dump(gettype($registeredRecord));
+			// array_diff($records, $registeredRecord);
+		}
 	}
 
 	/**
