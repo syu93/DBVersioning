@@ -341,16 +341,18 @@ class dbversioning {
 	{
 
 		$table  = false;
+		$length = 3;
 		$fPath 	= "dbv";
 
 		$H 		= array_search('-H', $arguments);
 		
 		$t 		= array_search('-t', $arguments);
+		$l 		= array_search('-l', $arguments);
 
 		$path 	= array_search('--path', $arguments);
 
 
-		// handle the -y option
+		// handle the -t option
 		if ($t) {
 			$nextIsOpt = 0;
 			$isNotLast = isset($arguments[$t + 1]);
@@ -364,6 +366,23 @@ class dbversioning {
 				$table = trim($arguments[$t + 1]);
 			} else {
 				throw new Exception("Syntax error with argument -t \n Refer help -h for more details", 1);
+			}
+		}
+
+		// handle the -l option
+		if ($l) {
+			$nextIsOpt = 0;
+			$isNotLast = isset($arguments[$l + 1]);
+			if ($isNotLast) {
+				$nextIsOpt = preg_match("/-\w/", $arguments[$l +1]);
+			} else {
+				throw new Exception("Syntax error with argument -l \n Refer help -h for more details", 1);
+			}
+
+			if ($nextIsOpt === 0) {
+				$length = trim($arguments[$l + 1]);
+			} else {
+				throw new Exception("Syntax error with argument -l \n Refer help -h for more details", 1);
 			}
 		}
 
@@ -396,7 +415,7 @@ class dbversioning {
 		
 		$dbname = $this->dbname;
 		$fPath 	= $this->fPath;
-		$this->diffRecords($dbname, $table, $fPath);
+		$this->diffRecords($dbname, $table, $fPath, $length);
 	}
 
 	/**
@@ -406,7 +425,7 @@ class dbversioning {
 	 * @param  string  $folderPath [Optional] The dbv folder path name. Default: dbv
 	 * @return void
 	 */
-	public function diffRecords($database, $table = false, $folderPath = "dbv")
+	public function diffRecords($database, $table = false, $folderPath = "dbv", $length = 3)
 	{
 		$pdo 			= $this->pdo;
 		$queryStructure = "";
@@ -460,7 +479,7 @@ class dbversioning {
 
 			$registeredRecord = json_decode(file_get_contents($filePath), true);
 
-			$this->operateDiff($tName, $registeredRecord, $records);
+			$this->operateDiff($tName, $registeredRecord, $records, $length);
 		}		
 	}
 
@@ -469,6 +488,7 @@ class dbversioning {
 	 * @param  string $table            The table name
 	 * @param  array  $registeredRecord The registered records
 	 * @param  array  $records          The records from the database
+	 * @param  string $length The length of revision number
 	 * @return void
 	 */
 	public function operateDiff($table, $registeredRecord, $records, $length = 3)
@@ -515,6 +535,10 @@ class dbversioning {
 		$migrationFile 		= 0;
 
 		// Check the migration file
+		if (!file_exists($this->fPath . "/data/meta")) {
+			mkdir($this->fPath . "/data/meta");
+		}
+		
 		if (file_exists($migrationFilePath)) {
 			$migrationFile = file_get_contents($migrationFilePath);
 		}
@@ -522,7 +546,7 @@ class dbversioning {
 
 		file_put_contents($migrationFilePath, $migrationNumber);
 
-		$this->printContent("[diff] Creating revisions", "light_cyan");
+		$this->printContent("[diff] Writing revison file", "light_cyan");
 	}
 
 	/**
