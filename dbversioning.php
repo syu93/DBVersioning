@@ -332,6 +332,11 @@ class dbversioning {
 		}
 	}
 
+	/**
+	 * Read the database and diff with the saved records
+	 * @param  array  $arguments The arguments passed to the command
+	 * @return void
+	 */
 	public function diffDataVersioning($arguments)
 	{
 
@@ -394,6 +399,13 @@ class dbversioning {
 		$this->diffRecords($dbname, $table, $fPath);
 	}
 
+	/**
+	 * Get all informations from the database to prepare the diff
+	 * @param  string  $database   The database name
+	 * @param  string  $table      [Optional] The table name if specify. Default: false
+	 * @param  string  $folderPath [Optional] The dbv folder path name. Default: dbv
+	 * @return void
+	 */
 	public function diffRecords($database, $table = false, $folderPath = "dbv")
 	{
 		$pdo 			= $this->pdo;
@@ -429,7 +441,7 @@ class dbversioning {
 				$req->execute();
 				$records = $req->fetchAll();
 
-				// get record file and compare
+				// FIXME : get record file and compare from multiple table
 			}
 		} else {
 			$tName = $table;
@@ -448,26 +460,129 @@ class dbversioning {
 
 			$registeredRecord = json_decode(file_get_contents($filePath), true);
 
-			$this->operateDiff($registeredRecord, $records);
-		}
-
+			$this->operateDiff($tName, $registeredRecord, $records);
+		}		
 	}
 
-	public function operateDiff($registeredRecord, $records)
+	/**
+	 * Operate the diffs and decide of the type
+	 * @param  string $table            The table name
+	 * @param  array  $registeredRecord The registered records
+	 * @param  array  $records          The records from the database
+	 * @return void
+	 */
+	public function operateDiff($table, $registeredRecord, $records, $length = 3)
 	{
-		if (count($records) != count($registeredRecord)) {
+		$pdo 					= $this->pdo;
+		$countRecords 			= count($records);
+		$countregisteredRecord 	= count($registeredRecord);
+		$primary 				= false;
+
+		// Get the table primary key
+		$q = "SHOW KEYS FROM $table WHERE Key_name = 'PRIMARY'";
+		$req = $pdo->query($q);
+		$res = $req->fetch();
+		if (!empty($res)) {
+			$primary = $res["Column_name"];
+		}
+
+		if ($countRecords != $countregisteredRecord) {
 			// Record added or removed
-			if (count($records) > count($registeredRecord)) {
+			if ($countRecords < $countregisteredRecord) {
 				// Record added
+				var_dump("Record added");
 			} else {
 				// Record removed
+				var_dump("Record removed");
 			}
 		} else {
-			// record updated
-			// array_diff_assoc($records, $registeredRecord);
-			// var_dump(gettype($registeredRecord));
-			// array_diff($records, $registeredRecord);
+			// record number not changed
+			for ($i=0; $i < $countRecords; $i++) { 
+				// Proceed the diff
+				$diff = array_diff($records[$i], $registeredRecord[$i]);
+
+				$pId = $records[$i][$primary];
+
+				// If there a diff between records
+				if (!empty($diff)) {
+					$this->_createMigrationFile("update", $table, $primary, $pId, $diff, $length);
+				} else {
+				}
+			}
 		}
+		
+		$migrationFilePath 	= $this->fPath . "/data/meta/migration";
+		$migrationFile 		= 0;
+
+		// Check the migration file
+		if (file_exists($migrationFilePath)) {
+			$migrationFile = file_get_contents($migrationFilePath);
+		}
+		$migrationNumber = str_pad($migrationFile + 1, $length, '0', STR_PAD_LEFT);
+
+		file_put_contents($migrationFilePath, $migrationNumber);
+
+		$this->printContent("[diff] Creating revisions", "light_cyan");
+	}
+
+	/**
+	 * Generate the migration sql file for revisions
+	 * @param  string  $type   The type of migration
+	 * @param  string  $table  The table to migrate
+	 * @param  string  $pkey   the table primary key
+	 * @param  string  $id     The record ID to
+	 * @param  array   $diff   The array of differences
+	 * @param  integer $length [Optional] The length of revision number. Default: 3
+	 * @return void
+	 */
+	private function _createMigrationFile($type, $table, $pkey, $id, $diff, $length = 3)
+	{
+		switch ($type) {
+			case 'update':
+				$paramsPh = [];
+				foreach ($diff as $key => $value) {
+					$paramsPh[] = " $key = \"$value\"";
+				}
+				$implodedParams = implode(' AND', $paramsPh);
+
+				$query = <<< EOH
+UPDATE $table 
+SET $implodedParams
+WHERE $pkey = "$id"
+EOH;
+				break;
+		}
+
+		$migrationPath 		= $this->fPath . "/data/revisions/";
+		$migrationFilePath 	= $this->fPath . "/data/meta/migration";
+		$migrationFile 		= 0;
+
+		// Check the migration file
+		if (file_exists($migrationFilePath)) {
+			$migrationFile = file_get_contents($migrationFilePath);
+		}
+
+		$migrationNumber = str_pad($migrationFile + 1, $length, '0', STR_PAD_LEFT);
+
+		if (!file_exists($migrationPath)) {
+			mkdir($migrationPath);
+		}
+
+		if (!file_exists($migrationPath . $migrationNumber)) {
+			mkdir($migrationPath . $migrationNumber);
+		}
+
+		$migration = <<< EOH
+-- =============================================
+-- DBVersioning
+-- Table : $table
+-- Migration script
+-- =============================================
+
+$query
+EOH;
+		// Create the resition file
+		file_put_contents($migrationPath . $migrationNumber . "/" . $table . ".sql", $migration);
 	}
 
 	/**
