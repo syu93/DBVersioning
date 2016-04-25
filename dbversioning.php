@@ -348,6 +348,7 @@ class dbversioning {
 		$H 		= array_search('-H', $arguments);
 		
 		$t 		= array_search('-t', $arguments);
+		$T 		= array_search('-T', $arguments);
 		$l 		= array_search('-l', $arguments);
 
 		$path 	= array_search('--path', $arguments);
@@ -368,6 +369,28 @@ class dbversioning {
 				$table = trim($arguments[$t + 1]);
 			} else {
 				throw new Exception("Syntax error with argument -t \n Refer help -h for more details", 1);
+			}
+		}
+
+		// handle the -T option
+		if ($T) {
+			$table = array();
+			$len = count($arguments);
+			$tTableId = $T+1;
+
+			$y = 0;
+			for ($i=$tTableId; $i < $len; $i++) {
+				$nextIsOpt = 0;
+				$isNotLast = isset($arguments[$T + 1]);
+				if ($isNotLast) {
+					$nextIsOpt = preg_match("/-\w/", $arguments[$tTableId + $y]);
+				} else {
+					throw new Exception("Syntax error with argument -T \n Refer help -h for more details", 1);
+				}
+				if ($nextIsOpt === 0) {
+					$table[] = trim($arguments[$tTableId + $y]);
+				}
+				$y++;
 			}
 		}
 
@@ -454,16 +477,10 @@ class dbversioning {
 		$queryStructure = "";
 		$result			= array();
 
-		if (!$table) {
-			$queryStructure = "SHOW TABLES FROM $database;";
-			$req = $pdo->prepare($queryStructure);
-			$req->execute();
-			$result = $req->fetchAll();
-		}
+		$last = true;
 
 		if (!$table) {
 			$queryStructure = "SHOW TABLES FROM $database;";
-
 			$req = $pdo->prepare($queryStructure);
 			$req->execute();
 			$result = $req->fetchAll();
@@ -487,13 +504,35 @@ class dbversioning {
 				$req->execute();
 				$records = $req->fetchAll();
 
-				// FIXME : get record file and compare from multiple table				
+				// FIXME : get record file and compare from multiple tables				
 			}
 
 			if ($skiping) {
 				$this->printContent("[diff] Skiping : " . implode(", ", $tSkip), "light_cyan");
 			}
-			$this->printContent("[diff] Creating records files", "light_cyan");
+			// $this->printContent("[diff] Creating records files", "light_cyan");
+		} else if (is_array($table)) {
+			$last = false;
+			foreach ($table as $key => $tName) {
+				if ($key == count($table) -1) {
+					$last = true;
+				}
+				$filePath = $folderPath . "/data/records/" . $tName . ".json";
+
+				if (!file_exists($filePath)) {
+					throw new Exception("Record not fund \n Try run init to export this record", 1);
+				}
+
+				$queryRecords = "SELECT * FROM $tName";
+
+				$req = $pdo->prepare($queryRecords);
+				$req->execute();
+				$records = $req->fetchAll();
+
+				$registeredRecord = json_decode(file_get_contents($filePath), true);
+
+				$this->operateDiff($tName, $registeredRecord, $records, $length, $last);
+			}
 		} else {
 			$tName = $table;
 
@@ -511,8 +550,10 @@ class dbversioning {
 
 			$registeredRecord = json_decode(file_get_contents($filePath), true);
 
-			$this->operateDiff($tName, $registeredRecord, $records, $length);
-		}		
+			$this->operateDiff($tName, $registeredRecord, $records, $length, $last);
+		}
+
+		$this->printContent("[diff] Writing revison file", "light_cyan");	
 	}
 
 	/**
@@ -523,7 +564,7 @@ class dbversioning {
 	 * @param  string $length The length of revision number
 	 * @return void
 	 */
-	public function operateDiff($table, $registeredRecord, $records, $length = 3)
+	public function operateDiff($table, $registeredRecord, $records, $length = 3, $last = true)
 	{
 		$pdo 					= $this->pdo;
 		$countRecords 			= count($records);
@@ -575,9 +616,10 @@ class dbversioning {
 		}
 		$migrationNumber = str_pad($migrationFile + 1, $length, '0', STR_PAD_LEFT);
 
-		file_put_contents($migrationFilePath, $migrationNumber);
-
-		$this->printContent("[diff] Writing revison file", "light_cyan");
+		// Do not writh migration file untile the end
+		if ($last) {
+			file_put_contents($migrationFilePath, $migrationNumber);
+		}
 	}
 
 	/**
