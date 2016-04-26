@@ -490,12 +490,23 @@ class dbversioning {
 		if (!$table) {
 			$countTalbe = count($result);
 			$this->printContent("[diff] $countTalbe tables found in $database", "light_cyan");
+			
+			$last = false;
 			foreach ($result as $key => $value) {
+				if ($key == count($result) -1) {
+					$last = true;
+				}
 				$tName = $value['Tables_in_' . $database];
 
 				if (in_array($tName, $tSkip)) {
 					$skiping = true;
 					continue;
+				}
+
+				$filePath = $folderPath . "/data/records/" . $tName . ".json";
+
+				if (!file_exists($filePath)) {
+					throw new Exception("Record not fund \n Try run init to export this record", 1);
 				}
 
 				$queryRecords = "SELECT * FROM $tName";
@@ -504,13 +515,15 @@ class dbversioning {
 				$req->execute();
 				$records = $req->fetchAll();
 
-				// FIXME : get record file and compare from multiple tables				
+				$registeredRecord = json_decode(file_get_contents($filePath), true);
+
+				$this->operateDiff($tName, $registeredRecord, $records, $length, $last);	
 			}
 
 			if ($skiping) {
 				$this->printContent("[diff] Skiping : " . implode(", ", $tSkip), "light_cyan");
 			}
-			// $this->printContent("[diff] Creating records files", "light_cyan");
+			$this->printContent("[diff] Creating records files", "light_cyan");
 		} else if (is_array($table)) {
 			$last = false;
 			foreach ($table as $key => $tName) {
@@ -614,10 +627,10 @@ class dbversioning {
 		if (file_exists($migrationFilePath)) {
 			$migrationFile = file_get_contents($migrationFilePath);
 		}
-		$migrationNumber = str_pad($migrationFile + 1, $length, '0', STR_PAD_LEFT);
 
 		// Do not writh migration file untile the end
 		if ($last) {
+			$migrationNumber = str_pad($migrationFile + 1, $length, '0', STR_PAD_LEFT);
 			file_put_contents($migrationFilePath, $migrationNumber);
 		}
 	}
