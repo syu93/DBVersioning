@@ -253,8 +253,8 @@ class dbversioning {
 		$this->getConnection($host, $dbname, $user, $pass, $port, $fPath);
 
 
-		$dbname = $this->dbname;
-		$fPath  = $this->fPath;
+		// $dbname = $this->dbname;
+		// $fPath  = $this->fPath;
 		$this->exportRecords($dbname, $table, $fPath);
 	}
 
@@ -491,7 +491,7 @@ class dbversioning {
 			$countTalbe = count($result);
 			$this->printContent("[diff] $countTalbe tables found in $database", "light_cyan");
 			foreach ($result as $key => $value) {
-				$tName = $value['Tables_in_prestashop'];
+				$tName = $value['Tables_in_' . $database];
 
 				if (in_array($tName, $tSkip)) {
 					$skiping = true;
