@@ -31,6 +31,9 @@ class dbversioning {
 				case 'init':
 					$this->initDataVersioning($arguments);
 					break;
+				case 'update':
+					$this->updateDataVersioning($arguments);
+					break;
 				case 'diff':
 					$this->diffDataVersioning($arguments);
 					break;
@@ -108,11 +111,6 @@ class dbversioning {
 
 	public function initDataVersioning($arguments)
 	{
-		if (!defined('PDO::ATTR_DRIVER_NAME')) {
-			throw new Exception("PDO driver unavailable", 1);
-		}
-
-
 		// Required dsn informations
 		$host 	= "localhost";
 		$dbname = "";
@@ -132,8 +130,10 @@ class dbversioning {
 		$p 		= array_search('-p', $arguments);
 
 		$t 		= array_search('-t', $arguments);
+		$T 		= array_search('-T', $arguments);
 		$path 	= array_search('--path', $arguments);
 
+		// handle the -H option : Help
 		if ($H) {
 			$this->printCommandHelp("init");
 			return;
@@ -190,7 +190,7 @@ class dbversioning {
 			}
 		}
 
-		// handle the -y option
+		// handle the -t option
 		if ($t) {
 			$nextIsOpt = 0;
 			$isNotLast = isset($arguments[$t + 1]);
@@ -204,6 +204,29 @@ class dbversioning {
 				$table = trim($arguments[$t + 1]);
 			} else {
 				throw new Exception("Syntax error with argument -t \n Refer help -h for more details", 1);
+			}
+		}
+
+		// handle the -T option
+		// FIXME : Handle multiple table export
+		if ($T) {
+			$table = array();
+			$len = count($arguments);
+			$tTableId = $T+1;
+
+			$y = 0;
+			for ($i=$tTableId; $i < $len; $i++) {
+				$nextIsOpt = 0;
+				$isNotLast = isset($arguments[$T + 1]);
+				if ($isNotLast) {
+					$nextIsOpt = preg_match("/-\w/", $arguments[$tTableId + $y]);
+				} else {
+					throw new Exception("Syntax error with argument -T \n Refer help -h for more details", 1);
+				}
+				if ($nextIsOpt === 0) {
+					$table[] = trim($arguments[$tTableId + $y]);
+				}
+				$y++;
 			}
 		}
 
@@ -252,9 +275,94 @@ class dbversioning {
 
 		$this->getConnection($host, $dbname, $user, $pass, $port, $fPath);
 
+		$this->exportRecords($dbname, $table, $fPath);
+	}
 
-		// $dbname = $this->dbname;
-		// $fPath  = $this->fPath;
+	/**
+	 * Read the database and export records
+	 * @param  array $arguments The arguments passed to the command
+	 * @return void
+	 */
+	public function updateDataVersioning($arguments)
+	{
+		$table 	= false;
+		$fPath 	= "dbv";
+
+		$H 		= array_search('-H', $arguments);
+
+		$t 		= array_search('-t', $arguments);
+		$T 		= array_search('-T', $arguments);
+		$path 	= array_search('--path', $arguments);
+
+		// handle the -H option : Help
+		if ($H) {
+			$this->printCommandHelp("init");
+			return;
+		}
+
+
+		// handle the -t option
+		if ($t) {
+			$nextIsOpt = 0;
+			$isNotLast = isset($arguments[$t + 1]);
+			if ($isNotLast) {
+				$nextIsOpt = preg_match("/-\w/", $arguments[$t +1]);
+			} else {
+				throw new Exception("Syntax error with argument -t \n Refer help -h for more details", 1);
+			}
+
+			if ($nextIsOpt === 0) {
+				$table = trim($arguments[$t + 1]);
+			} else {
+				throw new Exception("Syntax error with argument -t \n Refer help -h for more details", 1);
+			}
+		}
+
+		// handle the -T option
+		if ($T) {
+			$table = array();
+			$len = count($arguments);
+			$tTableId = $T+1;
+
+			$y = 0;
+			for ($i=$tTableId; $i < $len; $i++) {
+				$nextIsOpt = 0;
+				$isNotLast = isset($arguments[$T + 1]);
+				if ($isNotLast) {
+					$nextIsOpt = preg_match("/-\w/", $arguments[$tTableId + $y]);
+				} else {
+					throw new Exception("Syntax error with argument -T \n Refer help -h for more details", 1);
+				}
+				if ($nextIsOpt === 0) {
+					$table[] = trim($arguments[$tTableId + $y]);
+				}
+				$y++;
+			}
+		}
+
+		// handle the --path option
+		if ($path) {
+			$nextIsOpt = 0;
+			$isNotLast = isset($arguments[$path + 1]);
+			if ($isNotLast) {
+				$nextIsOpt = preg_match("/-\w/", $arguments[$path +1]);
+			} else {
+				throw new Exception("Syntax error with argument --path \n Refer help -h for more details", 1);
+			}
+
+			if ($nextIsOpt === 0) {
+				$fPath = trim($arguments[$path + 1]);
+			} else {
+				throw new Exception("Syntax error with argument --path \n Refer help -h for more details", 1);
+			}
+		}
+
+		// Connection must have already been initialized
+		$this->getConnection();
+		if (isset($this->dbname)) {
+			$dbname = $this->dbname;
+		}
+
 		$this->exportRecords($dbname, $table, $fPath);
 	}
 
@@ -627,6 +735,8 @@ class dbversioning {
 		if (file_exists($migrationFilePath)) {
 			$migrationFile = file_get_contents($migrationFilePath);
 		}
+
+		// Recurive diff
 
 		// Do not writh migration file untile the end
 		if ($last) {
