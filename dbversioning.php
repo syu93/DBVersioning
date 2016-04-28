@@ -587,6 +587,8 @@ class dbversioning {
 
 		$last = true;
 
+		// If no tables were specified
+		// Get all tables from the database
 		if (!$table) {
 			$queryStructure = "SHOW TABLES FROM $database;";
 			$req = $pdo->prepare($queryStructure);
@@ -594,44 +596,57 @@ class dbversioning {
 			$result = $req->fetchAll();
 		}
 
+		// Initialize the diff couter
+		$this->hasDiff = 0;
+
+		// If specified skip tables during the loop
 		$skiping = false;
 		if (!$table) {
 			$countTalbe = count($result);
-			$this->printContent("[diff] $countTalbe tables found in $database", "light_cyan");
+			$this->printContent("[diff] $countTalbe tables found in : $database", "light_cyan");
 			
+			// If it's the last row
 			$last = false;
+			// Loop over all tables
 			foreach ($result as $key => $value) {
+				// If the last
 				if ($key == count($result) -1) {
 					$last = true;
 				}
+				// Get the table name
 				$tName = $value['Tables_in_' . $database];
 
+				// Do skip if table is in list
 				if (in_array($tName, $tSkip)) {
 					$skiping = true;
 					continue;
 				}
 
+				// Get the path to the reecord file
 				$filePath = $folderPath . "/data/records/" . $tName . ".json";
 
 				if (!file_exists($filePath)) {
+					// FIXME : Gracefull
 					throw new Exception("Record not fund \n Try run init to export this record", 1);
 				}
 
+				// Get the current database records
 				$queryRecords = "SELECT * FROM $tName";
 
 				$req = $pdo->prepare($queryRecords);
 				$req->execute();
 				$records = $req->fetchAll();
 
+				// Load registered content records
 				$registeredRecord = json_decode(file_get_contents($filePath), true);
 
+				// Call the method to do the diff
 				$this->operateDiff($tName, $registeredRecord, $records, $length, $last);	
 			}
 
 			if ($skiping) {
 				$this->printContent("[diff] Skiping : " . implode(", ", $tSkip), "light_cyan");
 			}
-			$this->printContent("[diff] Creating records files", "light_cyan");
 		} else if (is_array($table)) {
 			$last = false;
 			foreach ($table as $key => $tName) {
@@ -673,8 +688,6 @@ class dbversioning {
 
 			$this->operateDiff($tName, $registeredRecord, $records, $length, $last);
 		}
-
-		$this->printContent("[diff] Writing revison file", "light_cyan");	
 	}
 
 	/**
@@ -687,6 +700,7 @@ class dbversioning {
 	 */
 	public function operateDiff($table, $registeredRecord, $records, $length = 3, $last = true)
 	{
+		// Loop
 		$pdo 					= $this->pdo;
 		$countRecords 			= count($records);
 		$countregisteredRecord 	= count($registeredRecord);
@@ -700,18 +714,22 @@ class dbversioning {
 			$primary = $res["Column_name"];
 		}
 
+		// If there is any different in the length of the records
 		if ($countRecords != $countregisteredRecord) {
+			$this->hasDiff++;
 			// Record added or removed
 			if ($countRecords < $countregisteredRecord) {
 				// Record added
-				var_dump("Record added");
+				// var_dump("Record added");
+				$diff = array(null);
 			} else {
 				// Record removed
-				var_dump("Record removed");
+				// var_dump("Record removed");
+				$diff = array(null);
 			}
 		} else {
 			// record number not changed
-			for ($i=0; $i < $countRecords; $i++) { 
+			for ($i=0; $i < $countRecords; $i++) {
 				// Proceed the diff
 				$diff = array_diff($records[$i], $registeredRecord[$i]);
 
@@ -719,6 +737,9 @@ class dbversioning {
 
 				// If there a diff between records
 				if (!empty($diff)) {
+					$this->hasDiff++;
+					// Record changed
+					// var_dump("Record changed");
 					$this->_createMigrationFile("update", $table, $primary, $pId, $diff, $length);
 				}
 			}
@@ -736,12 +757,19 @@ class dbversioning {
 			$migrationFile = file_get_contents($migrationFilePath);
 		}
 
-		// Recurive diff
+		if ($last && $this->hasDiff > 0) {
+			$this->printContent("[diff] $this->hasDiff diffs were found between records and database", "light_cyan");
+		}
 
 		// Do not writh migration file untile the end
-		if ($last) {
+		if ($last && $this->hasDiff > 0) {
 			$migrationNumber = str_pad($migrationFile + 1, $length, '0', STR_PAD_LEFT);
 			file_put_contents($migrationFilePath, $migrationNumber);
+			$this->printContent("[diff] Writing revison file", "light_cyan");
+			$this->printContent("[diff] Revision number : $migrationNumber", "light_green");
+		} else if ($last && $this->hasDiff == 0) {
+			// Fixme : get the real empty case
+			$this->printContent("[diff] No diffs found in your records", "yellow");
 		}
 	}
 
