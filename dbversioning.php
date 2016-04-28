@@ -831,8 +831,11 @@ EOH;
 
 $query
 EOH;
+		if (file_exists($migrationPath . $migrationNumber . "/" . $table . ".sql")) {
+			$migration = PHP_EOL . $migration;
+		}
 		// Create the resition file
-		file_put_contents($migrationPath . $migrationNumber . "/" . $table . ".sql", $migration);
+		file_put_contents($migrationPath . $migrationNumber . "/" . $table . ".sql", PHP_EOL . $migration, FILE_APPEND);
 	}
 
 	/**
