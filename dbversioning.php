@@ -785,6 +785,8 @@ class dbversioning {
 	 */
 	private function _createMigrationFile($type, $table, $pkey, $id, $diff, $length = 3)
 	{
+		$version = self::VERSION;
+
 		switch ($type) {
 			case 'update':
 				$paramsPh = [];
@@ -822,7 +824,7 @@ EOH;
 
 		$migration = <<< EOH
 -- =============================================
--- DBVersioning
+-- DBVersioning v$version
 -- Table : $table
 -- Migration script
 -- =============================================
