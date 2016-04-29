@@ -275,6 +275,10 @@ class dbversioning {
 
 		$this->getConnection($host, $dbname, $user, $pass, $port, $fPath);
 
+		if (isset($this->dbname)) {
+			$dbname = $this->dbname;
+		}
+
 		$this->exportRecords($dbname, $table, $fPath);
 	}
 
@@ -379,8 +383,11 @@ class dbversioning {
 		$queryStructure = "";
 		$result			= array();
 
+		$this->execTime();
+
 		if (!$table) {
 			$queryStructure = "SHOW TABLES FROM $database;";
+			var_dump($queryStructure);
 
 			$req = $pdo->prepare($queryStructure);
 			$req->execute();
@@ -403,7 +410,8 @@ class dbversioning {
 		if (file_exists($folderPath . "/data/records")) {
 			$this->printContent("[init] Reading records in records folder", "light_cyan");
 
-
+			// FIXME : Export specified table : -T option
+			// Check if is array
 			if (!$table) {
 				$countTalbe = count($result);
 				$this->printContent("[init] $countTalbe tables found in $database", "light_cyan");
@@ -420,7 +428,9 @@ class dbversioning {
 
 					file_put_contents($folderPath . "/data/records/$tName.json", json_encode($records));
 				}
-			} else if (!empty($table)) {
+			} else if (is_array($table)) {
+
+			} else if (!empty($table) && !is_array($table)) {
 				$this->printContent("[init] Creating records files for table ", "light_cyan", null, false);
 				$this->printContent($table, "light_green");
 
@@ -434,7 +444,13 @@ class dbversioning {
 
 				file_put_contents($folderPath . "/data/records/$tName.json", json_encode($records));
 			}
-			$this->printContent("[init] Successfully create records files", "light_cyan");
+
+			// Get the execution time
+			$time = $this->execTime('end');
+			$roundTime = $this->_getRoundTime($time);
+			$this->printContent("[Init] Init operation completed in $roundTime ms", 'light_cyan');
+
+			$this->printContent("[init] Successfully create records files", "light_green");
 			
 			$this->printContent("[Tip] Run \"diff\" command to generate revision files", "brown");
 		}
@@ -584,6 +600,8 @@ class dbversioning {
 		$pdo 			= $this->pdo;
 		$queryStructure = "";
 		$result			= array();
+
+		$this->execTime();
 
 		$last = true;
 
@@ -761,6 +779,12 @@ class dbversioning {
 			$this->printContent("[diff] $this->hasDiff diffs were found between records and database", "light_cyan");
 		}
 
+		if ($last) {
+			$time = $this->execTime('end');
+			$roundTime = $this->_getRoundTime($time);
+			$this->printContent("[Diff] Diff operation completed in $roundTime ms", 'light_cyan');
+		}
+
 		// Do not writh migration file untile the end
 		if ($last && $this->hasDiff > 0) {
 			$migrationNumber = str_pad($migrationFile + 1, $length, '0', STR_PAD_LEFT);
@@ -898,6 +922,27 @@ EOH;
 
 	    // Return the password
 	    return $password;
+	}
+
+	private function _getRoundTime($time)
+	{
+		return round($time, 3, PHP_ROUND_HALF_UP);
+	}
+
+	public function execTime($state = 'start')
+	{
+		if ($state == 'start') {
+			$this->startTime = microtime(true);
+		} else if ($state == 'end') {
+			$this->endTime = microtime(true);
+
+			if (isset($this->startTime)) {
+				$time = $this->endTime - $this->startTime;
+			} else {
+				return 'No time';
+			}
+			return $time;
+		}
 	}
 
 	public function printAbout()
