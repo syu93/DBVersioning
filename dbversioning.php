@@ -749,7 +749,7 @@ class dbversioning {
 			// record number not changed
 			for ($i=0; $i < $countRecords; $i++) {
 				// Proceed the diff
-				$diff = array_diff($records[$i], $registeredRecord[$i]);
+				$diff = array_diff($registeredRecord[$i], $records[$i]);
 
 				$pId = $records[$i][$primary];
 
