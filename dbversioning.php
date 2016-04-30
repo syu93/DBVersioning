@@ -742,7 +742,6 @@ class dbversioning {
 				$diff = array(null);
 			} else {
 				// Record removed
-				// var_dump("Record removed");
 				$diff = array(null);
 				for ($i=0; $i < $countRecords; $i++) {
 					// Proceed the diff
@@ -752,8 +751,13 @@ class dbversioning {
 						$pId = $records[$i][$primary];
 
 						$this->_createMigrationFile('remove', $table, $primary, $pId, $diff, $length);
+
+						unset($records[$i]);
+						var_dump("registeredRecord:",isset($registeredRecord[$i]),"records:",isset($records[$i]));
 					}
 				}
+				// Recursive
+				$this->operateDiff($table, $registeredRecord, $records, $length, $last);
 			}
 		} else {
 			// record number not changed
@@ -768,6 +772,11 @@ class dbversioning {
 					$this->hasDiff++;
 					// Record changed
 					$this->_createMigrationFile("update", $table, $primary, $pId, $diff, $length);
+
+					$records[$i] = $registeredRecord[$i];
+
+					// Recursive
+					$this->operateDiff($table, $registeredRecord, $records, $length, $last);
 				}
 			}
 		}
