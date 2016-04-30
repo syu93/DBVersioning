@@ -736,7 +736,7 @@ class dbversioning {
 		if ($countRecords != $countregisteredRecord) {
 			$this->hasDiff++;
 			// Record added or removed
-			if ($countRecords < $countregisteredRecord) {
+			if ($countregisteredRecord > $countRecords) {
 				// Record added
 				// var_dump("Record added");
 				$diff = array(null);
@@ -744,6 +744,16 @@ class dbversioning {
 				// Record removed
 				// var_dump("Record removed");
 				$diff = array(null);
+				for ($i=0; $i < $countRecords; $i++) {
+					// Proceed the diff
+					if (!isset($registeredRecord[$i])) {
+						$diff = $records[$i];
+
+						$pId = $records[$i][$primary];
+
+						$this->_createMigrationFile('remove', $table, $primary, $pId, $diff, $length);
+					}
+				}
 			}
 		} else {
 			// record number not changed
@@ -757,7 +767,6 @@ class dbversioning {
 				if (!empty($diff)) {
 					$this->hasDiff++;
 					// Record changed
-					// var_dump("Record changed");
 					$this->_createMigrationFile("update", $table, $primary, $pId, $diff, $length);
 				}
 			}
@@ -812,6 +821,12 @@ class dbversioning {
 		$version = self::VERSION;
 
 		switch ($type) {
+			case 'remove':
+				$query = <<<EOH
+DELETE FROM $table
+WHERE $pkey = "$id"
+EOH;
+				break;
 			case 'update':
 				$paramsPh = [];
 				foreach ($diff as $key => $value) {
