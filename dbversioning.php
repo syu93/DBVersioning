@@ -738,8 +738,20 @@ class dbversioning {
 			// Record added or removed
 			if ($countregisteredRecord > $countRecords) {
 				// Record added
-				// var_dump("Record added");
 				$diff = array(null);
+				for ($i=0; $i < $countregisteredRecord; $i++) { 
+					if (!isset($records[$i])) {
+						$diff = $registeredRecord[$i];
+
+						$pId = $registeredRecord[$i][$primary];
+
+						$this->_createMigrationFile('create', $table, $primary, $pId, $diff, $length);
+
+						$records[$i] = $registeredRecord[$i];
+					}
+				}
+				// Recursive
+				$this->operateDiff($table, $registeredRecord, $records, $length, $last);
 			} else {
 				// Record removed
 				$diff = array(null);
@@ -750,10 +762,9 @@ class dbversioning {
 
 						$pId = $records[$i][$primary];
 
-						$this->_createMigrationFile('remove', $table, $primary, $pId, $diff, $length);
+						$this->_createMigrationFile('delete', $table, $primary, $pId, $diff, $length);
 
 						unset($records[$i]);
-						var_dump("registeredRecord:",isset($registeredRecord[$i]),"records:",isset($records[$i]));
 					}
 				}
 				// Recursive
@@ -830,10 +841,20 @@ class dbversioning {
 		$version = self::VERSION;
 
 		switch ($type) {
-			case 'remove':
-				$query = <<<EOH
-DELETE FROM $table
-WHERE $pkey = "$id"
+			case 'create':
+				$paramsCol = [];
+				$paramsPh = [];
+				foreach ($diff as $key => $value) {
+					$paramsCol[] = " $key";
+					$paramsVal[] = " \"$value\"";
+				}
+				$implodedParamsCol = implode(', ', $paramsCol);
+				$implodedParamsVal = implode(', ', $paramsVal);
+
+				$query = <<< EOH
+INSERT INTO $table
+($implodedParamsCol)
+VALUES ($implodedParamsVal)
 EOH;
 				break;
 			case 'update':
@@ -846,6 +867,12 @@ EOH;
 				$query = <<< EOH
 UPDATE $table 
 SET $implodedParams
+WHERE $pkey = "$id"
+EOH;
+				break;
+			case 'delete':
+				$query = <<<EOH
+DELETE FROM $table
 WHERE $pkey = "$id"
 EOH;
 				break;
