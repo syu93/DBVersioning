@@ -257,8 +257,6 @@ class dbversioning {
 				$nextIsOpt = preg_match("/-\w/", $arguments[$p +1]);
 			}
 
-			// var_dump($nextIsOpt, $isNotLast);
-
 			// the following is not an option
 			if ($nextIsOpt === 0 && !$isNotLast) {
 				$pass = $this->waitForInput("Enter password :", true);
@@ -387,7 +385,6 @@ class dbversioning {
 
 		if (!$table) {
 			$queryStructure = "SHOW TABLES FROM $database;";
-			var_dump($queryStructure);
 
 			$req = $pdo->prepare($queryStructure);
 			$req->execute();
@@ -1117,15 +1114,18 @@ EOH;
     	$cmdTitle 	= "The following commands are currently supported:";
     	$commands	= <<< EOH
   init 		Initialize DBVersioning by reading and saving records.
+  update 	Update saved records
+  diff 		Create the revision file to update the database
 EOH;
 
-		$this->printContent($name, 'green');
+		// Print the content
+		$this->printContent($name, 'light_green');
 		$this->printContent($usageTitle, 'yellow');
 		$this->printContent($usage . PHP_EOL);
 		$this->printContent($optsTitle, 'yellow');
-		$this->printContent($options . PHP_EOL, 'green');
+		$this->printContent($options . PHP_EOL, 'light_green');
 		$this->printContent($cmdTitle, 'yellow');
-		$this->printContent($commands, 'green');
+		$this->printContent($commands, 'light_green');
 	}
 }
 
