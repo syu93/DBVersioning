@@ -57,6 +57,16 @@ class dbversioning {
 		}
 	}
 
+	/**
+	 * Initialize the connection with the database anc create the config file
+	 * @param  string $host   The database server host. [Default] : localhost
+	 * @param  string $dbname The database name to use
+	 * @param  string $user   The user to connect the database. [Default] : root
+	 * @param  string $pass   The password to connect the database
+	 * @param  string $port   The port to access the database. [Default] : 3306
+	 * @param  string $fPath  The path to the dbv folder. [Default] : dbv
+	 * @return void
+	 */
 	public function getConnection($host = "localhost", $dbname = "", $user = "root", $pass = "", $port = "3306", $fPath = "dbv")
 	{
 		if (!defined('PDO::ATTR_DRIVER_NAME')) {
@@ -109,6 +119,11 @@ class dbversioning {
 		}
 	}
 
+	/**
+	 * Initialize DBVersioning by reading and saving records.
+	 * @param  array $arguments The arguments passed to the command
+	 * @return void
+	 */
 	public function initDataVersioning($arguments)
 	{
 		// Required dsn informations
@@ -298,7 +313,7 @@ class dbversioning {
 
 		// handle the -H option : Help
 		if ($H) {
-			$this->printCommandHelp("init");
+			$this->printCommandHelp("update");
 			return;
 		}
 
@@ -365,7 +380,7 @@ class dbversioning {
 			$dbname = $this->dbname;
 		}
 
-		$this->exportRecords($dbname, $table, $fPath);
+		$this->exportRecords($dbname, $table, $fPath, 'update');
 	}
 
 	/**
@@ -375,7 +390,7 @@ class dbversioning {
 	 * @param  string  $folderPath The dbv installation path
 	 * @return void
 	 */
-	public function exportRecords($database, $table = false, $folderPath = "dbv")
+	public function exportRecords($database, $table = false, $folderPath = "dbv", $cmd = "init")
 	{
 		$pdo 			= $this->pdo;
 		$queryStructure = "";
@@ -392,28 +407,26 @@ class dbversioning {
 		}
 
 		if (!file_exists($folderPath)) {
-			$this->printContent("[init] Creating dbv folder", "light_cyan");
+			$this->printContent("[$cmd] Creating dbv folder", "light_cyan");
 			mkdir($folderPath);
 		}
 		if (!file_exists($folderPath . "/data")) {
-			$this->printContent("[init] Creating data folder", "light_cyan");
+			$this->printContent("[$cmd] Creating data folder", "light_cyan");
 			mkdir($folderPath . "/data");
 		}
 		if (!file_exists($folderPath . "/data/records")) {
-			$this->printContent("[init] Creating records folder", "light_cyan");
+			$this->printContent("[$cmd] Creating records folder", "light_cyan");
 			mkdir("dbv/data/records");
 		}
 
 		if (file_exists($folderPath . "/data/records")) {
-			$this->printContent("[init] Reading records in records folder", "light_cyan");
+			$this->printContent("[$cmd] Reading records in records folder", "light_cyan");
 
-			// FIXME : Export specified table : -T option
-			// Check if is array
 			if (!$table) {
 				$countTalbe = count($result);
-				$this->printContent("[init] $countTalbe tables found in $database", "light_cyan");
+				$this->printContent("[$cmd] $countTalbe tables found in $database", "light_cyan");
 
-				$this->printContent("[init] Creating records files", "light_cyan");
+				$this->printContent("[$cmd] Creating records files", "light_cyan");
 				foreach ($result as $key => $value) {
 					$tName = $value['Tables_in_prestashop'];
 
@@ -426,9 +439,17 @@ class dbversioning {
 					file_put_contents($folderPath . "/data/records/$tName.json", json_encode($records));
 				}
 			} else if (is_array($table)) {
+				foreach ($table as $key => $tName) {
+					$queryRecords = "SELECT * FROM $tName";
 
+					$req = $pdo->prepare($queryRecords);
+					$req->execute();
+					$records = $req->fetchAll();
+
+					file_put_contents($folderPath . "/data/records/$tName.json", json_encode($records));
+				}
 			} else if (!empty($table) && !is_array($table)) {
-				$this->printContent("[init] Creating records files for table ", "light_cyan", null, false);
+				$this->printContent("[$cmd] Creating records files for table ", "light_cyan", null, false);
 				$this->printContent($table, "light_green");
 
 				$tName = $table;
@@ -445,11 +466,11 @@ class dbversioning {
 			// Get the execution time
 			$time = $this->execTime('end');
 			$roundTime = $this->_getRoundTime($time);
-			$this->printContent("[Init] Init operation completed in $roundTime ms", 'light_cyan');
+			$this->printContent("[$cmd] $cmd operation completed in $roundTime ms", 'light_cyan');
 
-			$this->printContent("[init] Successfully create records files", "light_green");
+			$this->printContent("[$cmd] Successfully create records files", "light_green");
 			
-			$this->printContent("[Tip] Run \"diff\" command to generate revision files", "brown");
+			$this->printContent("[tip] Run \"diff\" command to generate revision files", "yellow");
 		}
 	}
 
@@ -475,6 +496,12 @@ class dbversioning {
 		$path 	= array_search('--path', $arguments);
 		$skip 	= array_search('--skip', $arguments);
 
+
+		// handle the -H option : Help
+		if ($H) {
+			$this->printCommandHelp("diff");
+			return;
+		}
 
 		// handle the -t option
 		if ($t) {
@@ -836,7 +863,7 @@ class dbversioning {
 	private function _createMigrationFile($type, $table, $pkey, $id, $diff, $length = 3)
 	{
 		$version = self::VERSION;
-
+		$query = "";
 		switch ($type) {
 			case 'create':
 				$paramsCol = [];
@@ -932,6 +959,22 @@ EOH;
 		return $input;
 	}
 
+	public function execTime($state = 'start')
+	{
+		if ($state == 'start') {
+			$this->startTime = microtime(true);
+		} else if ($state == 'end') {
+			$this->endTime = microtime(true);
+
+			if (isset($this->startTime)) {
+				$time = $this->endTime - $this->startTime;
+			} else {
+				return 'No time';
+			}
+			return $time;
+		}
+	}
+
 	/**
 	 * Test if a folder is empty
 	 * @param  string $dirPath path to folder to test
@@ -977,38 +1020,6 @@ EOH;
 		return round($time, 3, PHP_ROUND_HALF_UP);
 	}
 
-	public function execTime($state = 'start')
-	{
-		if ($state == 'start') {
-			$this->startTime = microtime(true);
-		} else if ($state == 'end') {
-			$this->endTime = microtime(true);
-
-			if (isset($this->startTime)) {
-				$time = $this->endTime - $this->startTime;
-			} else {
-				return 'No time';
-			}
-			return $time;
-		}
-	}
-
-	public function printAbout()
-	{
-		# code...
-	}
-
-	/**
-	 * Print the DBVersioning version
-	 * @return void
-	 */
-	public function printVersion()
-	{
-		$this->printContent('DBVersioning ', 'green', null, false);
-		$this->printContent('version ', null, null, false);
-		$this->printContent(self::VERSION, 'yellow');
-	}
-
 	/**
 	 * Print content to the user with colors
 	 * @param  string  $content content to be printed
@@ -1028,14 +1039,15 @@ EOH;
 		echo $colors->getColoredString($contents, $fcolor, $bcolor);
 	}
 
-	private function _getContent($content = '', $fcolor = null, $bcolor = null)
-	{
-		$colors = new Colors();
-		$contents = $content;
+	/****************************************************************************************\
+	 **************************** Print informations to the user ****************************
+	\****************************************************************************************/
 
-		return $colors->getColoredString($contents, $fcolor, $bcolor) . " ";
-	}
-
+	/**
+	 * Print the command help
+	 * @param  string $cmd the command help
+	 * @return void
+	 */
 	public function printCommandHelp($cmd)
 	{
 		switch ($cmd) {
@@ -1051,10 +1063,11 @@ EOH;
 		    	$optsTitle 	= "Options:";
 				$options 	= <<< EOH
   -d 		Database name.
-  -h 		Server host name.
-  -u 		Database user.
+  -h 		Server host name. Default: localhost.
+  -u 		Database user. Default: root.
   -p 		Database password.
-  -t 		[optional] the table to be exported.
+  -t 		[optional] The table to export.
+  -T 		[optional] The list of table to export
   --path 	[optional] The dbv folder path. Default: dbv
 EOH;
 
@@ -1075,7 +1088,71 @@ EOH;
 				$this->printContent("table_name","brown", null, false);
 				$this->printContent(".json'.", "green");
 				break;
-			
+			case 'update':
+		    	$usageTitle = "Usage:";
+		    	$usage 		= <<< EOH
+  update [options]
+EOH;
+
+		    	$optsTitle 	= "Options:";
+				$options 	= <<< EOH
+  -d 		Database name.
+  -h 		Server host name. Default: localhost.
+  -u 		Database user. Default: root.
+  -p 		Database password.
+  -t 		[optional] The table to export.
+  -T 		[optional] The list of table to export.
+  --path 	[optional] The dbv folder path. Default: dbv.
+EOH;
+
+		    	$helpTitle 	= "Help:";
+		    	$helpStart 	= "  The ";
+		    	$cmdName 	= "update ";
+		    	$help 		= "command update records
+  in the 'dbv/data/records/";
+
+				$this->printContent($usageTitle, 'yellow');
+				$this->printContent($usage . PHP_EOL);
+				$this->printContent($optsTitle, 'yellow');
+				$this->printContent($options . PHP_EOL, 'green');
+				$this->printContent($helpTitle, 'yellow');
+				$this->printContent($helpStart, 'green', null, false);
+				$this->printContent($cmdName, 'light_cyan', null, false);
+				$this->printContent($help, 'green', null, false);
+				$this->printContent("table_name","brown", null, false);
+				$this->printContent(".json'.", "green");
+				break;
+			case 'diff':
+		    	$usageTitle = "Usage:";
+		    	$usage 		= <<< EOH
+  diff [options]
+EOH;
+
+		    	$optsTitle 	= "Options:";
+				$options 	= <<< EOH
+  -t 		[optional] The table to diff.
+  -T		[optional] The list of table to diff.
+  -l		[optional] The length of the revision number. Default: 3.
+  --path	[optional] The dbv folder path. Default: dbv. Default: dbv.
+  --skip	[optional] The records to be skiped in the diff.
+EOH;
+
+		    	$helpTitle 	= "Help:";
+		    	$helpStart 	= "  The ";
+		    	$cmdName 	= "diff ";
+		    	$help 		= "command perform a difference between records files and database
+  and create sql revision files in dbv/data/revision/";
+
+				$this->printContent($usageTitle, 'yellow');
+				$this->printContent($usage . PHP_EOL);
+				$this->printContent($optsTitle, 'yellow');
+				$this->printContent($options . PHP_EOL, 'green');
+				$this->printContent($helpTitle, 'yellow');
+				$this->printContent($helpStart, 'green', null, false);
+				$this->printContent($cmdName, 'light_cyan', null, false);
+				$this->printContent($help, 'green', null);
+
+				break;
 			default:
 				throw new Exception('command does not exist');
 				break;
@@ -1126,6 +1203,30 @@ EOH;
 		$this->printContent($options . PHP_EOL, 'light_green');
 		$this->printContent($cmdTitle, 'yellow');
 		$this->printContent($commands, 'light_green');
+	}
+
+	public function printAbout()
+	{
+		$help = <<< EOH
+  DBVersioning - PHP-based database versioning
+EOH;
+		$helpComment = <<< EOH
+  DBVersioning is a database versioning tool created to help teams working  with local database.
+  See : https://github.com/syu93/DBVersioning for more informations.
+EOH;
+		$this->printContent($help, 'light_green');
+		$this->printContent($helpComment, 'yellow');
+	}
+
+	/**
+	 * Print the DBVersioning version
+	 * @return void
+	 */
+	public function printVersion()
+	{
+		$this->printContent('DBVersioning ', 'green', null, false);
+		$this->printContent('version ', null, null, false);
+		$this->printContent(self::VERSION, 'yellow');
 	}
 }
 
