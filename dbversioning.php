@@ -15,7 +15,7 @@ class dbversioning {
 	public function run($arguments)
 	{
 		try {
-			if (!isset($arguments[1]) || $arguments[1] == "-h") {
+			if (!isset($arguments[1]) || $arguments[1] == "-h" || $arguments[1] == "--help") {
 				$this->printHelp();
 				exit;
 			}
