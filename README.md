@@ -11,7 +11,7 @@ Clone DBVersioning from github:
 ```bash
     $ git clone https://github.com/syu93/DBVersioning.git
 ```
-`Note:` To install it globaly, copy the __*dbversioning*__ and __*dbversioning.php*__ scripts in your bin folder: _**/usr/local/bin**_.
+`Note:` To install it globaly, copy the __*bin/dbversioning*__ and __*dbversioning.php*__ scripts in your bin folder: _**/usr/local/bin**_.
 
 Then it done. Juste run:
 ```bash
