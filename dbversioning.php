@@ -33,7 +33,7 @@ class dbversioning {
 	/**
 	 * The DBVersioning version
 	 */
-	const VERSION = "0.0.1";
+	const VERSION = "0.0.1.beta";
 
 	/**
 	 * Run and dispatches the DBVersioning program
