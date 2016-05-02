@@ -871,6 +871,7 @@ class dbversioning {
 			file_put_contents($migrationFilePath, $migrationNumber);
 			$this->printContent("[diff] Writing revison file", "light_cyan");
 			$this->printContent("[diff] Revision number : $migrationNumber", "light_green");
+			$this->printContent("[tip] Add the \"dbv/data/meta/migration\" file to your .gitignore", "yellow");
 		} else if ($last && $this->hasDiff == 0) {
 			// Fixme : get the real empty case
 			$this->printContent("[diff] No diffs found in your records", "yellow");
