@@ -12,5 +12,6 @@
             "email": "herve.tutuaku@gmail.com"
         }
     ],
-    "minimum-stability": "beta"
+    "minimum-stability": "beta",
+    "bin": ["dbversioning.php", "bin/dbversioning"]
 }
