@@ -24,7 +24,7 @@
  * SOFTWARE.
  *
  * @package DBVersioning
- * @version 0.0.1
+ * @version 0.0.1.beta
  * @author Hervé </Syu93> Tutuaku <herve.tutuaku@gmail.com>
  * @link https://github.com/syu93/DBVersioning
  */
