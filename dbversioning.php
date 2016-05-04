@@ -454,7 +454,7 @@ class dbversioning {
 
 				$this->printContent("[$cmd] Creating records files", "light_cyan");
 				foreach ($result as $key => $value) {
-					$tName = $value['Tables_in_prestashop'];
+					$tName = $value['Tables_in_' . $table];
 
 					$queryRecords = "SELECT * FROM $tName";
 
@@ -507,7 +507,8 @@ class dbversioning {
 	 */
 	public function diffDataVersioning($arguments)
 	{
-
+		// FIXME : Check the diff method
+		// Infinit loop on first document change in record files
 		$table  = false;
 		$length = 3;
 		$fPath 	= "dbv";
