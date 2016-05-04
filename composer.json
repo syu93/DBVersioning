@@ -2,7 +2,7 @@
     "name": "syu93/db-versioning",
     "description": "DBVersioning is a database versioning tool created to help teams working  with local database.",
     "require": {
-        "php": "^5.5",
+        "php": "^5.0",
         "ext-pdo_mysql": "^1.0"
     },
     "license": "MIT",
@@ -13,5 +13,5 @@
         }
     ],
     "minimum-stability": "beta",
-    "bin": ["dbversioning.php", "bin/dbversioning"]
+    "bin": ["bin/dbversioning.php", "bin/dbversioning"]
 }
