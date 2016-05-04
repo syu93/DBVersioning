@@ -447,7 +447,6 @@ class dbversioning {
 		}
 
 		if (file_exists($folderPath . "/data/records")) {
-			$this->printContent("[$cmd] Reading records in records folder", "light_cyan");
 
 			if (!$table) {
 				$countTalbe = count($result);
