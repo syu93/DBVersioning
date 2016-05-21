@@ -24,7 +24,7 @@
  * SOFTWARE.
  *
  * @package DBVersioning
- * @version 0.0.1.beta
+ * @version 0.0.2.beta
  * @author Hervé </Syu93> Tutuaku <herve.tutuaku@gmail.com>
  * @link https://github.com/syu93/DBVersioning
  */
@@ -33,7 +33,7 @@ class dbversioning {
 	/**
 	 * The DBVersioning version
 	 */
-	const VERSION = "0.0.1.beta";
+	const VERSION = "0.0.2.beta";
 
 	/**
 	 * Run and dispatches the DBVersioning program
@@ -447,6 +447,7 @@ class dbversioning {
 		}
 
 		if (file_exists($folderPath . "/data/records")) {
+			$this->printContent("[$cmd] Reading records in records folder", "light_cyan");
 
 			if (!$table) {
 				$countTalbe = count($result);
@@ -454,7 +455,7 @@ class dbversioning {
 
 				$this->printContent("[$cmd] Creating records files", "light_cyan");
 				foreach ($result as $key => $value) {
-					$tName = $value['Tables_in_' . $table];
+					$tName = $value['Tables_in_prestashop'];
 
 					$queryRecords = "SELECT * FROM $tName";
 
@@ -507,8 +508,7 @@ class dbversioning {
 	 */
 	public function diffDataVersioning($arguments)
 	{
-		// FIXME : Check the diff method
-		// Infinit loop on first document change in record files
+
 		$table  = false;
 		$length = 3;
 		$fPath 	= "dbv";
@@ -739,6 +739,7 @@ class dbversioning {
 				$this->operateDiff($tName, $registeredRecord, $records, $length, $last);
 			}
 		} else {
+			$last = true;
 			$tName = $table;
 
 			$filePath = $folderPath . "/data/records/" . $tName . ".json";
@@ -778,48 +779,162 @@ class dbversioning {
 		// Get the table primary key
 		$q = "SHOW KEYS FROM $table WHERE Key_name = 'PRIMARY'";
 		$req = $pdo->query($q);
-		$res = $req->fetch();
-		if (!empty($res)) {
-			$primary = $res["Column_name"];
+
+		$res = $req->fetchAll();
+		// Count primary key res
+		$cRes = count($res);
+		if (!empty($res) && $cRes > 1) {
+			$primary = [];
+			for ($i=0; $i < $cRes; $i++) { 
+				$primary[] = $res[$i]["Column_name"];
+			}
+		} else if (!empty($res)) {
+			$primary = $res[0]["Column_name"];
 		}
 
 		// If there is any different in the length of the records
 		if ($countRecords != $countregisteredRecord) {
-			$this->hasDiff++;
 			// Record added or removed
 			if ($countregisteredRecord > $countRecords) {
 				// Record added
 				$diff = array(null);
 				for ($i=0; $i < $countregisteredRecord; $i++) { 
-					if (!isset($records[$i])) {
-						$diff = $registeredRecord[$i];
+					if (isset($records[$i])) {
+						$diff= [];
 
-						$pId = $registeredRecord[$i][$primary];
+						// If the primary key is a composed primary key
+						if (is_array($primary)) {
+							$pId = [];
+							$rpId = [];
+							foreach ($primary as $key => $primaryKey) {
+								$pId[] = $records[$i][$primaryKey];
+								$rpId[] = $registeredRecord[$i][$primaryKey];
+							}
 
-						$this->_createMigrationFile('create', $table, $primary, $pId, $diff, $length);
+							// Check if the primary keys are different
+							$primaryDiff = array_diff($pId, $rpId);
+							$countPrimaryDiff = count($primaryDiff);
 
-						$records[$i] = $registeredRecord[$i];
+							if ($countPrimaryDiff > 0) {
+								$this->hasDiff++;
+								
+								$diff = array($registeredRecord[$i]);
+
+								// adjuste the recode count number
+								$countRecords++;
+								// And rebase the record array
+								array_splice($records, $i, 0, $diff);
+
+								$this->_createMigrationFile('create', $table, $primary, $pId, $diff[0], $length);
+							}
+						} else {
+							$pId = $records[$i][$primary];
+							$rpId = $registeredRecord[$i][$primary];
+							if ($pId != $rpId) {
+								$this->hasDiff++;
+								// The diff record
+								$diff = array($registeredRecord[$i]);
+								// adjuste the recode count number
+								$countRecords++;
+								array_splice($records, $i, 0, $diff);
+
+								$this->_createMigrationFile('create', $table, $primary, $pId, $diff[0], $length);
+							}
+						}
+					} else {						
+						$this->hasDiff++;
+
+						// Need to encapsulate the diff record in an array
+						$diff = array($registeredRecord[$i]);
+
+						// adjuste the registered record count number
+						$countRecords++;
+
+						// Add the diff array at the position of the registered record
+						array_splice($records, $i, 0, $diff);
+
+						$this->_createMigrationFile('create', $table, $primary, $pId, $diff[0], $length);
 					}
 				}
 				// Recursive
 				$this->operateDiff($table, $registeredRecord, $records, $length, $last);
+				return;
 			} else {
 				// Record removed
 				$diff = array(null);
 				for ($i=0; $i < $countRecords; $i++) {
 					// Proceed the diff
-					if (!isset($registeredRecord[$i])) {
+					if (isset($registeredRecord[$i])) {
+						// FIXME
+						$diff= [];
+
+						// If the table have a comosed primary key
+						if (is_array($primary)) {
+							$pId = [];
+							$rpId = [];
+							foreach ($primary as $key => $primaryKey) {
+								$pId[] = $records[$i][$primaryKey];
+								$rpId[] = $registeredRecord[$i][$primaryKey];
+							}
+
+							// Check if the primary keys are different
+							$primaryDiff = array_diff($pId, $rpId);
+							$countPrimaryDiff = count($primaryDiff);
+
+							// Test if their is any difference between the two primary keys set
+							// But if the diff happen at the very end of the record
+							// the loop will just continue through and never noticed the diff
+							if ($countPrimaryDiff > 0) {
+								$this->hasDiff++;
+								// The record line to unset
+								$diff = $records[$i];
+								// Do unset the record
+								unset($records[$i]);
+								
+								 // adjuste the record count number
+								$countRecords--;
+								// And rebase the record array
+								$records = array_values($records);
+
+								// $this->_createMigrationFile('delete', $table, $primary, $pId, $diff, $length);
+							}
+						} else {
+							$pId = $records[$i][$primary];
+							$rpId = $registeredRecord[$i][$primary];
+
+							if ($pId != $rpId) {
+								$this->hasDiff++;
+
+								$diff = $records[$i];
+
+								unset($records[$i]);
+
+								$countRecords--;
+
+								$records = array_values($records);
+
+								// $this->_createMigrationFile('delete', $table, $primary, $pId, $diff, $length);
+							}
+						}
+					} else {
+						$this->hasDiff++;
+						// The record line to unset
 						$diff = $records[$i];
-
-						$pId = $records[$i][$primary];
-
-						$this->_createMigrationFile('delete', $table, $primary, $pId, $diff, $length);
-
+						// Do unset the record
 						unset($records[$i]);
+						
+						 // adjuste the record count number
+						$countRecords--;
+						// And rebase the record array
+						$records = array_values($records);
+
+						// Create the record file
+						// $this->_createMigrationFile('delete', $table, $primary, $pId, $diff, $length);
 					}
 				}
 				// Recursive
 				$this->operateDiff($table, $registeredRecord, $records, $length, $last);
+				return;
 			}
 		} else {
 			// record number not changed
@@ -827,22 +942,28 @@ class dbversioning {
 				// Proceed the diff
 				$diff = array_diff($registeredRecord[$i], $records[$i]);
 
+				if (is_array($primary)) {
+					// var_dump('PRIMARY');
+					continue;
+					// throw new Exception("Composed primary keys to manage", 1);
+				}
+
 				$pId = $records[$i][$primary];
 
 				// If there a diff between records
 				if (!empty($diff)) {
 					$this->hasDiff++;
 					// Record changed
-					$this->_createMigrationFile("update", $table, $primary, $pId, $diff, $length);
+					// $this->_createMigrationFile("update", $table, $primary, $pId, $diff, $length);
 
 					$records[$i] = $registeredRecord[$i];
 
 					// Recursive
-					$this->operateDiff($table, $registeredRecord, $records, $length, $last);
+					// $this->operateDiff($table, $registeredRecord, $records, $length, $last);
 				}
 			}
 		}
-		
+
 		$migrationFilePath 	= $this->fPath . "/data/meta/migration";
 		$migrationFile 		= 0;
 
@@ -868,7 +989,7 @@ class dbversioning {
 		// Do not writh migration file untile the end
 		if ($last && $this->hasDiff > 0) {
 			$migrationNumber = str_pad($migrationFile + 1, $length, '0', STR_PAD_LEFT);
-			file_put_contents($migrationFilePath, $migrationNumber);
+			// file_put_contents($migrationFilePath, $migrationNumber);
 			$this->printContent("[diff] Writing revison file", "light_cyan");
 			$this->printContent("[diff] Revision number : $migrationNumber", "light_green");
 			$this->printContent("[tip] Add the \"dbv/data/meta/migration\" file to your .gitignore", "yellow");
